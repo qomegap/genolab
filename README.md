@@ -2,8 +2,7 @@
 
 `genolab` is a lazy and small bioinformatics toolkit
 
-The current pipeline:
-
+The current commands:
 1. `blastReport` → clean BLAST outfmt 6, infer strand and add normalized coordinates (because BLAST output has end - start <0).
 2. `dicti`      → rename `sseqid` using a 2‑column dictionary table (check input example "old_name new_name").
 3. `blastBed`   → convert the processed BLAST output into BED
