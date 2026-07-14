@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+BED_CONFIG_DIR="$PROJECT_DIR/config"
+BED_CONFIG="$BED_CONFIG_DIR/blastBed.conf"
+
+create_bed_config() {
+    mkdir -p "$BED_CONFIG_DIR"
+
+    cat > "$BED_CONFIG" <<EOF
+BED_NAME="feature"
+BED_SCORE="900"
+BED_RGB="4,32,105"
+BED_FORMAT="BED9"
+BED_ZERO_BASED="true"
+EOF
+}
+
+load_bed_config() {
+    if [[ ! -f "$BED_CONFIG" ]]; then
+        create_bed_config
+    fi
+
+    source "$BED_CONFIG"
+
+    : "${BED_NAME:=feature}"
+    : "${BED_SCORE:=900}"
+    : "${BED_RGB:=4,32,105}"
+    : "${BED_FORMAT:=BED9}"
+    : "${BED_ZERO_BASED:=true}"
+}
+
+usage() {
+    cat <<EOF
+genolab - small bioinformatics toolkit
+
+Usage:
+  genolab blastReport -i INPUT -o OUTPUT
+  genolab dicti -i INPUT -d DictTable -o OUTPUT
+  genolab blastBed -i INPUT -o OUTPUT
+  genolab -h | --help
+
+Commands:
+  blastReport   Clean BLAST tabular output, infer strand, and generate report
+  dicti         Rename values in the sseqid column of a BLAST output using a 2-column dictionary table
+  blastBed      Convert processed BLAST output to BED
+EOF
+}
+
+case "${1:-}" in
+    blastReport)
+        shift
+        python3 "$PROJECT_DIR/scripts/blastReport.py" "$@"
+        ;;
+    dicti)
+        shift
+        bash "$PROJECT_DIR/scripts/dicti.sh" "$@"
+        ;;
+    blastBed)
+    shift
+
+    load_bed_config
+
+    input=""
+    output=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -i|--input)
+                input="$2"
+                shift 2
+                ;;
+            -o|--output)
+                output="$2"
+                shift 2
+                ;;
+            -h|--help)
+                echo "Usage: genolab blastBed -i INPUT -o OUTPUT"
+                exit 0
+                ;;
+            *)
+                echo "Unknown option for blastBed: $1" >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    if [[ -z "$input" || -z "$output" ]]; then
+        echo "Usage: genolab blastBed -i INPUT -o OUTPUT" >&2
+        exit 1
+    fi
+
+    R --slave --no-restore --file="$PROJECT_DIR/scripts/blastBed.R" --args \
+        "$input" \
+        "$output" \
+        "$BED_NAME" \
+        "$BED_SCORE" \
+        "$BED_RGB" \
+        "$BED_FORMAT" \
+        "$BED_ZERO_BASED"
+    ;;
+    -h|--help|"")
+        usage
+        ;;
+    *)
+        echo "Unknown command: $1" >&2
+        usage >&2
+        exit 1
+        ;;
+esac
